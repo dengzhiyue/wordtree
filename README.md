@@ -132,3 +132,5 @@ React 18 + TypeScript 5 + Vite 5 + Tailwind CSS 3 + Zustand 4 + Zod 3 + lucide-r
 
 ## 数据与隐私
 错题、设置、已掌握均存本地存储。外部请求只有两条：牛津词典官方 API / 你自己配的 LLM 接口，没有中间服务器存储任何 Key。
+
+# (auto trigger Actions build - 2026-08-27T00:23:08.9684941+08:00)
