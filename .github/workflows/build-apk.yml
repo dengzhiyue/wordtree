@@ -56,27 +56,38 @@ jobs:
             npx cap add android
           fi
 
-      - name: Make gradlew executable (often lost on Windows-hosted repos)
+      - name: Ensure Gradle wrapper exists (auto rebuild if missing on Windows-hosted repos)
+        working-directory: android
         run: |
-          if [ -x android/gradlew ]; then
-            echo "gradlew is executable"
-          else
-            if [ -f android/gradlew ]; then
-              chmod +x android/gradlew
-              echo "gradlew chmod +x applied"
-            else
-              echo "gradlew not found — will rebuild wrapper via gradle-gradle-build-action"
-            fi
+          if [ -x ./gradlew ]; then
+            echo "gradlew OK (executable)"
+            exit 0
           fi
+          if [ -f ./gradlew ]; then
+            chmod +x ./gradlew
+            echo "gradlew OK (chmod +x applied)"
+            exit 0
+          fi
+          echo "gradlew missing — regenerating wrapper with global Gradle (gradle-wrapper.properties already pinned version)"
+          WRAPPER_PROPS=gradle/wrapper/gradle-wrapper.properties
+          if [ -f "$WRAPPER_PROPS" ]; then
+            VER=$(grep -Eo 'gradle-[0-9.]+-bin' "$WRAPPER_PROPS" | head -n1 | sed -E 's/gradle-([0-9.]+)-bin/\1/')
+          fi
+          if [ -z "$VER" ]; then
+            VER="8.7"
+          fi
+          echo "Using Gradle version: $VER"
+          which gradle || (apt-get update && apt-get install -y gradle) || true
+          gradle wrapper --gradle-version "$VER"
+          chmod +x ./gradlew
+          ls -la gradle/wrapper gradlew || true
 
-      - name: Build debug APK with Gradle
+      - name: Build debug APK with Gradle + assembleDebug
         uses: gradle/actions/setup-gradle@v4
         with:
           build-root-directory: android
           cache-encryption-key: ${{ runner.os }}-gradle-enc
-      - name: Run assembleDebug
-        working-directory: android
-        run: ./gradlew --no-daemon assembleDebug
+          arguments: --no-daemon assembleDebug
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
