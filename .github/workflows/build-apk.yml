@@ -81,12 +81,33 @@ jobs:
           fi
           echo "android/gradlew ready — $(ls -la android/gradlew)"
 
-      - name: Build debug APK with Gradle + assembleDebug
+      # NOTE: gradle/actions/setup-gradle@v4 is ONLY a caching / Gradle-home setup step.
+      # It NO LONGER accepts `arguments` (deprecated) or `build-root-directory` (not a valid input).
+      # The actual Gradle build MUST be done in a separate `run:` step via the project's own
+      # ./gradlew (which Capacitor just generated above), so the Gradle distribution version
+      # (declared in android/gradle/wrapper/gradle-wrapper.properties) is 100% matched to
+      # the project's AGP version — eliminating any "system Gradle vs project Gradle" mismatch.
+      - name: (cache-only) Wire Gradle build cache via official setup-gradle@v4
         uses: gradle/actions/setup-gradle@v4
         with:
-          build-root-directory: android
           cache-encryption-key: ${{ runner.os }}-gradle-enc
-          arguments: --no-daemon assembleDebug
+
+      - name: Build debug APK with ./gradlew assembleDebug (project-owned wrapper)
+        run: |
+          set -e
+          chmod +x android/gradlew || true
+          echo "=== gradle-wrapper.properties (pinned version, no system Gradle involved) ==="
+          cat android/gradle/wrapper/gradle-wrapper.properties
+          echo ""
+          cd android
+          export GRADLE_OPTS="-Xmx3g -XX:MaxMetaspaceSize=768m -Dfile.encoding=UTF-8"
+          ./gradlew --version
+          echo ""
+          echo "=== Running assembleDebug (wrapper-owned Gradle version above) ==="
+          ./gradlew assembleDebug --no-daemon --stacktrace
+          echo ""
+          echo "=== APK outputs ==="
+          ls -lh app/build/outputs/apk/debug/ 2>&1 || true
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
