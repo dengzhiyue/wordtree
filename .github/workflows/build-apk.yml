@@ -3,9 +3,6 @@ name: Build RecurWords Android (APK · debug · free)
 on:
   push:
     branches: [main, master]
-    paths-ignore:
-      - '*.md'
-      - '.vscode/**'
   pull_request:
     branches: [main, master]
   workflow_dispatch:
