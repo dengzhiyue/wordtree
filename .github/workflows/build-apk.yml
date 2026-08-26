@@ -62,15 +62,26 @@ jobs:
             rm -rf android
             npx cap add android
             npx cap sync android
-            # Restore project-specific Android customizations committed to this repo
-            # (AndroidManifest, MainActivity.java, launcher icons, splash, statusbar colors,
-            #  network config, variables.gradle, etc.).
-            # git checkout only overwrites TRACKED files; the brand-new complete Gradle wrapper
-            # files (gradlew / gradlew.bat / gradle-wrapper.jar) never existed in the previous
-            # commit, so they are preserved untouched.
-            echo "Re-applying repo-tracked Android customizations on top of Capacitor's output"
-            git checkout HEAD -- android 2>/dev/null || true
-            # Sync once more because our custom AndroidManifest / assets might have shifted.
+            # Restore ONLY user-authored Android customizations committed to this repo:
+            #   - AndroidManifest.xml (package name, permissions, intents)
+            #   - MainActivity.java / Kotlin main class
+            #   - launcher icons, splash, colors, strings (res/)
+            #   - assets/ (copied-in binaries, fonts, etc.)
+            # WE EXPLICITLY REFUSE TO RESTORE ANY GRADLE BUILD FILES:
+            #   - android/build.gradle, android/app/build.gradle, android/settings.gradle
+            #   - android/gradle/wrapper/*, android/gradlew, android/gradlew.bat
+            #   - android/variables.gradle
+            # These must come 100% from `npx cap add android` so the Gradle distribution,
+            # AGP (Android Gradle Plugin) version, and Capacitor runtime (capacitor-android
+            # plugin + capacitorAndroid property injection) are perfectly in sync.
+            # Mixing repo-tracked old build scripts with fresh Capacitor output caused:
+            #   MissingPropertyException: Could not get unknown property 'capacitorAndroid'
+            echo "Re-applying repo-tracked Android SOURCE customizations (build scripts left untouched)"
+            git checkout HEAD -- \
+              android/app/src/main/ \
+              android/gradle.properties \
+              2>/dev/null || true
+            # Sync once more because custom AndroidManifest / assets may tweak capacitor outputs
             npx cap sync android
           fi
           # Sanity: gradlew must now exist + be executable
