@@ -45,52 +45,37 @@ jobs:
       - name: Build web assets (Vite dist/)
         run: npm run build
 
-      - name: (Re)build android/ via Capacitor official CLI (guarantees complete Gradle wrapper)
+      - name: Build 100% fresh android/ via Capacitor official CLI (zero repo android files reused)
         id: cap
         run: |
-          # Only reuse existing android/ if it contains a COMPLETE Gradle wrapper (gradlew + wrapper jar).
-          # If anything is missing (common in Windows-hosted repos that never ran Android Studio),
-          # wipe it and let @capacitor/android regenerate a full, version-matched project.
-          REUSE_OK=1
-          [ -x "android/gradlew" ] || REUSE_OK=0
-          [ -f "android/gradle/wrapper/gradle-wrapper.jar" ] || REUSE_OK=0
-          if [ "$REUSE_OK" = "1" ]; then
-            echo "android/ has complete Gradle wrapper — running sync only"
-            npx cap sync android
-          else
-            echo "android/ incomplete or missing — regenerating via \`npx cap add android\` (pulls templates from installed @capacitor/android)"
-            rm -rf android
-            npx cap add android
-            npx cap sync android
-            # Restore ONLY user-authored Android customizations committed to this repo:
-            #   - AndroidManifest.xml (package name, permissions, intents)
-            #   - MainActivity.java / Kotlin main class
-            #   - launcher icons, splash, colors, strings (res/)
-            #   - assets/ (copied-in binaries, fonts, etc.)
-            # WE EXPLICITLY REFUSE TO RESTORE ANY GRADLE BUILD FILES:
-            #   - android/build.gradle, android/app/build.gradle, android/settings.gradle
-            #   - android/gradle/wrapper/*, android/gradlew, android/gradlew.bat
-            #   - android/variables.gradle
-            # These must come 100% from `npx cap add android` so the Gradle distribution,
-            # AGP (Android Gradle Plugin) version, and Capacitor runtime (capacitor-android
-            # plugin + capacitorAndroid property injection) are perfectly in sync.
-            # Mixing repo-tracked old build scripts with fresh Capacitor output caused:
-            #   MissingPropertyException: Could not get unknown property 'capacitorAndroid'
-            echo "Re-applying repo-tracked Android SOURCE customizations (build scripts left untouched)"
-            git checkout HEAD -- \
-              android/app/src/main/ \
-              android/gradle.properties \
-              2>/dev/null || true
-            # Sync once more because custom AndroidManifest / assets may tweak capacitor outputs
-            npx cap sync android
-          fi
-          # Sanity: gradlew must now exist + be executable
+          # CI STRATEGY: NEVER reuse android/ from the repo checkout.
+          # Our repo's android/ was generated on Windows with a different Capacitor version and
+          # is INCOMPLETE (missing gradlew / gradle-wrapper.jar) + CONTAINS OLD FILES that pollute
+          # fresh builds (caused 2 distinct bugs: MissingPropertyException 'capacitorAndroid' and
+          # MergeResources Duplicate resources 'AppTheme.NoActionBar').
+          #
+          # The correct approach in CI: always start from zero. capacitor.config.ts already
+          # declares appId, appName, statusBar color, server scheme, server hostname — all
+          # customizations needed for Android. `npx cap sync android` writes them into the
+          # brand-new project automatically, so no manual git-checkout restore is required.
+          set -e
+          echo "=== Wiping repo-provided android/ (if any) to guarantee a clean rebuild ==="
+          rm -rf android
+          echo "=== npx cap add android  (templates from installed @capacitor/android — version-matched) ==="
+          npx cap add android
+          echo "=== npx cap sync android  (writes capacitor.config.ts → Android configs) ==="
+          npx cap sync android
+          # Sanity: gradlew must exist + be executable
           if [ ! -x "android/gradlew" ]; then
-            echo "ERROR: android/gradlew is still missing after regeneration. Listing android/:"
+            echo "ERROR: android/gradlew missing after fresh add. Listing android/:"
             ls -la android android/gradle android/gradle/wrapper 2>&1 || true
             exit 1
           fi
-          echo "android/gradlew ready — $(ls -la android/gradlew)"
+          echo ""
+          echo "=== Capacitor-owned build system — gradlew, wrapper, pinned Gradle version ==="
+          ls -la android/gradlew
+          echo "--- gradle-wrapper.properties ---"
+          cat android/gradle/wrapper/gradle-wrapper.properties
 
       # NOTE: gradle/actions/setup-gradle@v4 is ONLY a caching / Gradle-home setup step.
       # It NO LONGER accepts `arguments` (deprecated) or `build-root-directory` (not a valid input).
