@@ -1,0 +1,92 @@
+name: Build RecurWords Android (APK · debug · free)
+
+on:
+  push:
+    branches: [main, master]
+    paths-ignore:
+      - '*.md'
+      - '.vscode/**'
+  pull_request:
+    branches: [main, master]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: write
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-apk:
+    name: Build Android debug APK
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      FORCE_COLOR: 1
+    steps:
+      - name: Checkout sources
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Setup Java 17 (Temurin · AGP 8.x requires JDK 17)
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+          cache: 'gradle'
+
+      - name: Install npm dependencies
+        run: npm ci --no-audit --no-fund
+
+      - name: Build web assets (Vite dist/)
+        run: npm run build
+
+      - name: Ensure android platform is present & sync web assets
+        id: cap
+        run: |
+          if [ -d "android/app/src/main" ]; then
+            echo "android/ skeleton present, running sync only"
+            npx cap sync android
+          else
+            echo "android/ missing, adding platform and syncing"
+            npx cap add android
+          fi
+
+      - name: Make gradlew executable (often lost on Windows-hosted repos)
+        run: |
+          if [ -x android/gradlew ]; then
+            echo "gradlew is executable"
+          else
+            if [ -f android/gradlew ]; then
+              chmod +x android/gradlew
+              echo "gradlew chmod +x applied"
+            else
+              echo "gradlew not found — will rebuild wrapper via gradle-gradle-build-action"
+            fi
+          fi
+
+      - name: Build debug APK with Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          build-root-directory: android
+          cache-encryption-key: ${{ runner.os }}-gradle-enc
+      - name: Run assembleDebug
+        working-directory: android
+        run: ./gradlew --no-daemon assembleDebug
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: recurwords-debug-apk
+          path: |
+            android/app/build/outputs/apk/debug/*.apk
+            android/app/build/outputs/apk/debug/output-metadata.json
+          retention-days: 30
+          if-no-files-found: error

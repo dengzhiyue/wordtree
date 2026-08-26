@@ -1,0 +1,40 @@
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Deps
+node_modules
+
+# Build output
+dist
+dist-ssr
+*.local
+
+# IDE / OS
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+Thumbs.db
+
+# ========== Capacitor / Android ==========
+android/.gradle
+android/build
+android/app/build
+android/**/*-debug.apk
+android/**/*-release.apk
+android/**/output-metadata.json
+android/local.properties
+android/captures
+android/.idea
+android/.cxx
+android/app/release
+android/app/src/main/assets/public
+
+# Gradle
+*.iml
+.gradle
+build/

@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- 紫色渐变背景用纯色，前景图标保持和 PWA 一致的风格 -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:strokeWidth="2"
+        android:strokeColor="#7C3AED"
+        android:pathData="M54,22m-12,0a12,12 0,1 1,24 0a12,12 0,1 1,-24 0" />
+    <path
+        android:fillColor="#FFFFFF"
+        android:strokeWidth="2"
+        android:strokeColor="#7C3AED"
+        android:pathData="M87,54m-12,0a12,12 0,1 1,24 0a12,12 0,1 1,-24 0" />
+    <path
+        android:fillColor="#FFFFFF"
+        android:strokeWidth="2"
+        android:strokeColor="#7C3AED"
+        android:pathData="M21,54m-12,0a12,12 0,1 1,24 0a12,12 0,1 1,-24 0" />
+    <path
+        android:strokeColor="#7C3AED"
+        android:strokeWidth="3"
+        android:pathData="M33,54 L42,54" />
+    <path
+        android:strokeColor="#7C3AED"
+        android:strokeWidth="3"
+        android:pathData="M66,54 L75,54" />
+    <!-- 中央 R 字 -->
+    <path
+        android:fillColor="#7C3AED"
+        android:pathData="M46,40 L54,40 A6,6 0 0 1 54,52 L48,52 L48,68 L46,68 Z M48,42 L48,50 L54,50 A4,4 0 0 0 54,42 Z" />
+</vector>

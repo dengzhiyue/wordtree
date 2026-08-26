@@ -1,0 +1,82 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --brand: 124 58 237;
+    --brand-soft: 237 233 254;
+    --surface: 255 255 255;
+    --surface-muted: 244 244 245;
+    --text: 24 24 27;
+    --text-muted: 113 113 122;
+    --border: 228 228 231;
+    --sat: env(safe-area-inset-top, 0px);
+    --sar: env(safe-area-inset-right, 0px);
+    --sab: env(safe-area-inset-bottom, 0px);
+    --sal: env(safe-area-inset-left, 0px);
+  }
+  .dark {
+    --brand: 167 139 250;
+    --brand-soft: 46 29 88;
+    --surface: 24 24 27;
+    --surface-muted: 39 39 42;
+    --text: 244 244 245;
+    --text-muted: 161 161 170;
+    --border: 63 63 70;
+  }
+  html,
+  body,
+  #root {
+    min-height: 100dvh;
+  }
+  html,
+  body {
+    height: 100%;
+    background: rgb(var(--surface));
+    color: rgb(var(--text));
+    overflow-x: hidden;
+  }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial,
+      'Noto Sans SC', sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -webkit-tap-highlight-color: transparent;
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+    touch-action: manipulation;
+    overscroll-behavior-y: none;
+  }
+  input,
+  textarea,
+  button,
+  select {
+    font: inherit;
+  }
+  .font-serif-en {
+    font-family: 'Iowan Old Style', 'Apple Garamond', Georgia, 'Times New Roman', serif;
+  }
+}
+
+@layer utilities {
+  .pb-safe-bottom {
+    padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 0.75rem);
+  }
+  .pt-safe-top {
+    padding-top: calc(env(safe-area-inset-top, 0px) + 0.25rem);
+  }
+  .min-safe-pb {
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+  .touch-target {
+    min-width: 44px;
+    min-height: 44px;
+  }
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+  .no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+}
