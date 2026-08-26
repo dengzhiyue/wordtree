@@ -45,42 +45,41 @@ jobs:
       - name: Build web assets (Vite dist/)
         run: npm run build
 
-      - name: Ensure android platform is present & sync web assets
+      - name: (Re)build android/ via Capacitor official CLI (guarantees complete Gradle wrapper)
         id: cap
         run: |
-          if [ -d "android/app/src/main" ]; then
-            echo "android/ skeleton present, running sync only"
+          # Only reuse existing android/ if it contains a COMPLETE Gradle wrapper (gradlew + wrapper jar).
+          # If anything is missing (common in Windows-hosted repos that never ran Android Studio),
+          # wipe it and let @capacitor/android regenerate a full, version-matched project.
+          REUSE_OK=1
+          [ -x "android/gradlew" ] || REUSE_OK=0
+          [ -f "android/gradle/wrapper/gradle-wrapper.jar" ] || REUSE_OK=0
+          if [ "$REUSE_OK" = "1" ]; then
+            echo "android/ has complete Gradle wrapper — running sync only"
             npx cap sync android
           else
-            echo "android/ missing, adding platform and syncing"
+            echo "android/ incomplete or missing — regenerating via \`npx cap add android\` (pulls templates from installed @capacitor/android)"
+            rm -rf android
             npx cap add android
+            npx cap sync android
+            # Restore project-specific Android customizations committed to this repo
+            # (AndroidManifest, MainActivity.java, launcher icons, splash, statusbar colors,
+            #  network config, variables.gradle, etc.).
+            # git checkout only overwrites TRACKED files; the brand-new complete Gradle wrapper
+            # files (gradlew / gradlew.bat / gradle-wrapper.jar) never existed in the previous
+            # commit, so they are preserved untouched.
+            echo "Re-applying repo-tracked Android customizations on top of Capacitor's output"
+            git checkout HEAD -- android 2>/dev/null || true
+            # Sync once more because our custom AndroidManifest / assets might have shifted.
+            npx cap sync android
           fi
-
-      - name: Ensure Gradle wrapper exists (auto rebuild if missing on Windows-hosted repos)
-        working-directory: android
-        run: |
-          if [ -x ./gradlew ]; then
-            echo "gradlew OK (executable)"
-            exit 0
+          # Sanity: gradlew must now exist + be executable
+          if [ ! -x "android/gradlew" ]; then
+            echo "ERROR: android/gradlew is still missing after regeneration. Listing android/:"
+            ls -la android android/gradle android/gradle/wrapper 2>&1 || true
+            exit 1
           fi
-          if [ -f ./gradlew ]; then
-            chmod +x ./gradlew
-            echo "gradlew OK (chmod +x applied)"
-            exit 0
-          fi
-          echo "gradlew missing — regenerating wrapper with global Gradle (gradle-wrapper.properties already pinned version)"
-          WRAPPER_PROPS=gradle/wrapper/gradle-wrapper.properties
-          if [ -f "$WRAPPER_PROPS" ]; then
-            VER=$(grep -Eo 'gradle-[0-9.]+-bin' "$WRAPPER_PROPS" | head -n1 | sed -E 's/gradle-([0-9.]+)-bin/\1/')
-          fi
-          if [ -z "$VER" ]; then
-            VER="8.7"
-          fi
-          echo "Using Gradle version: $VER"
-          which gradle || (apt-get update && apt-get install -y gradle) || true
-          gradle wrapper --gradle-version "$VER"
-          chmod +x ./gradlew
-          ls -la gradle/wrapper gradlew || true
+          echo "android/gradlew ready — $(ls -la android/gradlew)"
 
       - name: Build debug APK with Gradle + assembleDebug
         uses: gradle/actions/setup-gradle@v4
