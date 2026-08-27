@@ -14,8 +14,8 @@ export const DEFAULT_SETTINGS: Settings = {
   oxfordAppKey: '',
   oxfordProxyBase: '',
   llmApiKey: '',
-  llmModel: 'gpt-4o-mini',
-  llmBaseUrl: 'https://api.openai.com/v1',
+  llmModel: 'deepseek-chat',
+  llmBaseUrl: 'https://api.deepseek.com/v1',
   targetCorrect: 3,
   theme: 'system',
 };
