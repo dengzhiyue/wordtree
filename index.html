@@ -17,13 +17,28 @@
     <link rel="manifest" href="/manifest.webmanifest" />
     <title>RecurWords · 递归式英文词汇学习</title>
     <!-- 百度统计（UV/PV/用户分布） https://tongji.baidu.com -->
+    <!-- 兼容两种场景：
+         1. 浏览器 https:// 打开（GitHub Pages / 本地预览）→ 自动读取 location 上报
+         2. 安卓 APP file:///android_asset 打开（Capacitor WebView）→ 手动指定虚拟 URL，避免 file:// 协议被百度拒收
+    -->
     <script>
       var _hmt = _hmt || [];
+      // 关键：file:// 协议下必须提前 setAutoPageview=false，再 _trackPageview(虚拟URL)
+      if (location.protocol === 'file:') {
+        _hmt.push(['_setAutoPageview', false]);
+      }
       (function () {
         var hm = document.createElement("script");
         hm.src = "https://hm.baidu.com/hm.js?3cf70fe126a4cbadaf67fb11b66ff944";
         var s = document.getElementsByTagName("script")[0];
         s.parentNode.insertBefore(hm, s);
+        hm.onload = function () {
+          if (location.protocol === 'file:') {
+            // 用一个假的 HTTP URL 上报，百度后台才能看到正常的 PV
+            var fakeUrl = 'https://recurwords.app/android/' + (location.hash || '').replace(/^#/, '') || 'home';
+            _hmt.push(['_trackPageview', fakeUrl]);
+          }
+        };
       })();
     </script>
   </head>
