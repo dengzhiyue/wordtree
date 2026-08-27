@@ -9,8 +9,10 @@ import type {
   ReviewSession,
   SelfTestState,
   Settings,
+  WordBankRecord,
+  WordBook,
+  WordBookTreeNode,
   WordNode,
-  WrongWordRecord,
 } from '@/types';
 import { uid } from '@/utils/text';
 
@@ -39,10 +41,11 @@ type S = {
   checkAnswer: () => Promise<void>;
   resetTree: () => void;
 
-  // ---------- wrong bank ----------
-  wrongWords: WrongWordRecord[];
+  // ---------- word bank ----------
+  wordBank: WordBankRecord[];
   masteredWords: MasteredWord[];
-  removeFromWrongBank: (word: string) => void;
+  addToWordBank: (word: string, correctAnswers: string[]) => void;
+  removeFromWordBank: (word: string) => void;
   deleteRecord: (word: string) => void;
   batchDelete: (words: string[]) => void;
   batchRemove: (words: string[]) => void;
@@ -53,13 +56,25 @@ type S = {
     isCorrect: boolean;
     targetCorrect: number;
   }) => { masteredThisRound: boolean };
-  buildReviewQueue: (limit?: number) => WrongWordRecord[];
+  guessExampleWord: (p: {
+    word: string;
+    correctAnswers: string[];
+    userAnswer: string;
+    targetCorrect: number;
+  }) => Promise<{ isCorrect: boolean; degraded: boolean }>;
+  buildReviewQueue: (limit?: number) => WordBankRecord[];
 
   // ---------- review session ----------
   reviewSession: ReviewSession;
-  startReview: (queue: WrongWordRecord[]) => void;
+  startReview: (queue: WordBankRecord[]) => void;
   advanceReview: () => void;
   closeReview: () => void;
+
+  // ---------- word books ----------
+  wordBooks: WordBook[];
+  expandedDescendantCount: () => number;
+  generateWordBook: () => WordBook | null;
+  deleteWordBook: (id: string) => void;
 };
 
 function applyThemeDOM(theme: Settings['theme']) {
@@ -142,6 +157,8 @@ export const useAppStore = create<S>((set, get) => {
           parentId: null,
           source: res.source,
         };
+        // 查过的词自动入单词库
+        get().addToWordBank(w, res.chineseMeanings);
         set({ phase: 'browsing', rootNode: root, focusNodeId: root.id });
       } catch (e) {
         set({
@@ -182,6 +199,8 @@ export const useAppStore = create<S>((set, get) => {
           ...n,
           children: [...n.children, newNode],
         }));
+        // 例句点击展开的词也入单词库
+        get().addToWordBank(word, res.chineseMeanings);
         set({ rootNode: nextRoot, focusNodeId: newNode.id });
       } catch (e) {
         set({ errorMsg: (e as Error).message || '获取子释义失败。' });
@@ -265,42 +284,70 @@ export const useAppStore = create<S>((set, get) => {
         lastMasteredFlag: false,
       }),
 
-    // ---------- wrong bank ----------
-    wrongWords: initial.wrongWords,
+    // ---------- word bank ----------
+    wordBank: initial.wordBank,
     masteredWords: initial.masteredWords,
 
-    removeFromWrongBank: (word) => {
-      const list = get().wrongWords.filter((w) => w.word !== word);
-      Storage.saveWrongWords(list);
+    addToWordBank: (word, correctAnswers) => {
+      const list = [...get().wordBank];
+      const idx = list.findIndex((w) => w.word === word);
+      if (idx >= 0) {
+        // 已在库中，更新 correctAnswers（如果有新的）
+        if (correctAnswers.length && !list[idx].correctAnswers.length) {
+          list[idx] = { ...list[idx], correctAnswers };
+          Storage.saveWordBank(list);
+          set({ wordBank: list });
+        }
+      } else {
+        list.push({
+          word,
+          correctAnswers,
+          wrongCount: 0,
+          consecutiveCorrect: 0,
+          targetCorrect: get().settings.targetCorrect,
+          firstAddedTime: Date.now(),
+          lastWrongTime: 0,
+          lastReviewTime: 0,
+          userWrongAnswers: [],
+          isWrong: false,
+        });
+        Storage.saveWordBank(list);
+        set({ wordBank: list });
+      }
+    },
+
+    removeFromWordBank: (word) => {
+      const list = get().wordBank.filter((w) => w.word !== word);
+      Storage.saveWordBank(list);
       const masterList = [
         ...get().masteredWords.filter((m) => m.word !== word),
         { word, masteredTime: Date.now(), fromWrongBank: true },
       ];
       Storage.saveMasteredWords(masterList);
-      set({ wrongWords: list, masteredWords: masterList });
+      set({ wordBank: list, masteredWords: masterList });
     },
 
     deleteRecord: (word) => {
-      const list = get().wrongWords.filter((w) => w.word !== word);
-      Storage.saveWrongWords(list);
-      set({ wrongWords: list });
+      const list = get().wordBank.filter((w) => w.word !== word);
+      Storage.saveWordBank(list);
+      set({ wordBank: list });
     },
     batchDelete: (words) => {
       const s = new Set(words);
-      const list = get().wrongWords.filter((w) => !s.has(w.word));
-      Storage.saveWrongWords(list);
-      set({ wrongWords: list });
+      const list = get().wordBank.filter((w) => !s.has(w.word));
+      Storage.saveWordBank(list);
+      set({ wordBank: list });
     },
     batchRemove: (words) => {
       const s = new Set(words);
-      const list = get().wrongWords.filter((w) => !s.has(w.word));
-      Storage.saveWrongWords(list);
+      const list = get().wordBank.filter((w) => !s.has(w.word));
+      Storage.saveWordBank(list);
       const add = words
         .filter((w) => !get().masteredWords.find((m) => m.word === w))
         .map((word) => ({ word, masteredTime: Date.now(), fromWrongBank: true }));
       const mList = [...get().masteredWords, ...add];
       Storage.saveMasteredWords(mList);
-      set({ wrongWords: list, masteredWords: mList });
+      set({ wordBank: list, masteredWords: mList });
     },
 
     recordResult: ({ word, correctAnswers, userAnswer, isCorrect, targetCorrect }) => {
@@ -310,78 +357,76 @@ export const useAppStore = create<S>((set, get) => {
       ];
       Storage.saveLearningHistory(hist);
 
+      // 确保词在单词库中
+      get().addToWordBank(word, correctAnswers);
+
       let masteredThisRound = false;
-      const wrongList = [...get().wrongWords];
-      const idx = wrongList.findIndex((w) => w.word === word);
+      const list = [...get().wordBank];
+      const idx = list.findIndex((w) => w.word === word);
+      if (idx < 0) return { masteredThisRound };
+
+      const now = Date.now();
       if (!isCorrect) {
-        const now = Date.now();
-        if (idx >= 0) {
-          wrongList[idx] = {
-            ...wrongList[idx],
-            wrongCount: wrongList[idx].wrongCount + 1,
-            consecutiveCorrect: 0,
-            lastWrongTime: now,
-            lastReviewTime: now,
-            correctAnswers: correctAnswers.length ? correctAnswers : wrongList[idx].correctAnswers,
-            userWrongAnswers: [...wrongList[idx].userWrongAnswers, userAnswer].slice(-20),
-          };
-        } else {
-          wrongList.push({
-            word,
-            correctAnswers,
-            wrongCount: 1,
-            consecutiveCorrect: 0,
-            targetCorrect,
-            firstWrongTime: now,
-            lastWrongTime: now,
-            lastReviewTime: now,
-            userWrongAnswers: userAnswer ? [userAnswer] : [],
-          });
-        }
-        Storage.saveWrongWords(wrongList);
-        set({ wrongWords: wrongList, learningHistory: hist });
+        list[idx] = {
+          ...list[idx],
+          isWrong: true,
+          wrongCount: list[idx].wrongCount + 1,
+          consecutiveCorrect: 0,
+          lastWrongTime: now,
+          lastReviewTime: now,
+          correctAnswers: correctAnswers.length ? correctAnswers : list[idx].correctAnswers,
+          userWrongAnswers: [...list[idx].userWrongAnswers, userAnswer].slice(-20),
+        };
+        Storage.saveWordBank(list);
+        set({ wordBank: list, learningHistory: hist });
       } else {
-        if (idx >= 0) {
-          const r = wrongList[idx];
-          const next = {
-            ...r,
-            consecutiveCorrect: r.consecutiveCorrect + 1,
-            lastReviewTime: Date.now(),
-          };
-          if (next.consecutiveCorrect >= next.targetCorrect) {
-            wrongList.splice(idx, 1);
-            const mList = [
-              ...get().masteredWords.filter((m) => m.word !== word),
-              { word, masteredTime: Date.now(), fromWrongBank: true },
-            ];
-            Storage.saveMasteredWords(mList);
-            masteredThisRound = true;
-            Storage.saveWrongWords(wrongList);
-            set({ wrongWords: wrongList, masteredWords: mList, learningHistory: hist });
-          } else {
-            wrongList[idx] = next;
-            Storage.saveWrongWords(wrongList);
-            set({ wrongWords: wrongList, learningHistory: hist });
-          }
+        const r = list[idx];
+        const next = {
+          ...r,
+          consecutiveCorrect: r.consecutiveCorrect + 1,
+          lastReviewTime: now,
+        };
+        if (next.isWrong && next.consecutiveCorrect >= next.targetCorrect) {
+          // 从单词库移除（已掌握）
+          list.splice(idx, 1);
+          const mList = [
+            ...get().masteredWords.filter((m) => m.word !== word),
+            { word, masteredTime: now, fromWrongBank: true },
+          ];
+          Storage.saveMasteredWords(mList);
+          masteredThisRound = true;
+          Storage.saveWordBank(list);
+          set({ wordBank: list, masteredWords: mList, learningHistory: hist });
         } else {
-          const exists = get().masteredWords.find((m) => m.word === word);
-          if (!exists) {
-            const mList = [
-              ...get().masteredWords,
-              { word, masteredTime: Date.now(), fromWrongBank: false },
-            ];
-            Storage.saveMasteredWords(mList);
-            set({ masteredWords: mList, learningHistory: hist });
-          } else {
-            set({ learningHistory: hist });
-          }
+          list[idx] = next;
+          Storage.saveWordBank(list);
+          set({ wordBank: list, learningHistory: hist });
         }
       }
       return { masteredThisRound };
     },
 
+    guessExampleWord: async ({ word, correctAnswers, userAnswer, targetCorrect }) => {
+      const settings = get().settings;
+      const { ok, degraded } = await judgeMatch({
+        word,
+        userAnswer,
+        correctAnswers,
+        settings,
+      });
+      get().recordResult({
+        word,
+        correctAnswers,
+        userAnswer,
+        isCorrect: ok,
+        targetCorrect,
+      });
+      return { isCorrect: ok, degraded };
+    },
+
     buildReviewQueue: (limit = 50) => {
-      const list = get().wrongWords;
+      // 只复习标记为错词的记录
+      const list = get().wordBank.filter((w) => w.isWrong);
       const maxCount = Math.max(1, ...list.map((w) => w.wrongCount));
       const DAY = 24 * 3600 * 1000;
       const scored = list.map((w) => {
@@ -406,6 +451,57 @@ export const useAppStore = create<S>((set, get) => {
       else set({ reviewSession: { ...s, index: s.index + 1 } });
     },
     closeReview: () => set({ reviewSession: null }),
+
+    // ---------- word books ----------
+    wordBooks: initial.wordBooks,
+
+    expandedDescendantCount: () => {
+      const root = get().rootNode;
+      if (!root) return 0;
+      let count = 0;
+      function traverse(node: WordNode) {
+        for (const child of node.children) {
+          count++;
+          traverse(child);
+        }
+      }
+      traverse(root);
+      return count;
+    },
+
+    generateWordBook: () => {
+      const root = get().rootNode;
+      if (!root) return null;
+      const count = get().expandedDescendantCount();
+      if (count < 5) return null;
+
+      function toBookNode(n: WordNode): WordBookTreeNode {
+        return {
+          word: n.word,
+          chineseMeanings: n.chineseMeanings,
+          depth: n.depth,
+          children: n.children.map(toBookNode),
+        };
+      }
+
+      const book: WordBook = {
+        id: `wb-${uid()}`,
+        rootWord: root.word,
+        createdAt: Date.now(),
+        nodeCount: count + 1, // 包括根节点
+        tree: toBookNode(root),
+      };
+      const list = [book, ...get().wordBooks];
+      Storage.saveWordBooks(list);
+      set({ wordBooks: list });
+      return book;
+    },
+
+    deleteWordBook: (id) => {
+      const list = get().wordBooks.filter((b) => b.id !== id);
+      Storage.saveWordBooks(list);
+      set({ wordBooks: list });
+    },
   };
 });
 

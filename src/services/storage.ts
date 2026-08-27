@@ -3,6 +3,8 @@ import type {
   LearningRecord,
   MasteredWord,
   Settings,
+  WordBankRecord,
+  WordBook,
   WrongWordRecord,
 } from '@/types';
 
@@ -22,15 +24,42 @@ export const DEFAULT_SETTINGS: Settings = {
 
 const DEFAULT_STORAGE: AppStorageShape = {
   wrongWords: [],
+  wordBank: [],
+  wordBooks: [],
   masteredWords: [],
   learningHistory: [],
   settings: DEFAULT_SETTINGS,
   version: 1,
 };
 
+/** 将旧版 wrongWords 迁移为新版 wordBank 记录 */
+function migrateWrongWords(old: WrongWordRecord[]): WordBankRecord[] {
+  return old.map((w) => ({
+    word: w.word,
+    correctAnswers: w.correctAnswers,
+    wrongCount: w.wrongCount,
+    consecutiveCorrect: w.consecutiveCorrect,
+    targetCorrect: w.targetCorrect,
+    firstAddedTime: w.firstWrongTime,
+    lastWrongTime: w.lastWrongTime,
+    lastReviewTime: w.lastReviewTime,
+    userWrongAnswers: w.userWrongAnswers,
+    isWrong: true,
+  }));
+}
+
 function deepMerge(base: AppStorageShape, raw: any): AppStorageShape {
+  // 优先使用新版 wordBank；如果没有，尝试从旧版 wrongWords 迁移
+  const wordBank: WordBankRecord[] = Array.isArray(raw?.wordBank)
+    ? raw.wordBank
+    : Array.isArray(raw?.wrongWords)
+      ? migrateWrongWords(raw.wrongWords)
+      : base.wordBank;
+
   return {
     wrongWords: Array.isArray(raw?.wrongWords) ? raw.wrongWords : base.wrongWords,
+    wordBank,
+    wordBooks: Array.isArray(raw?.wordBooks) ? raw.wordBooks : base.wordBooks,
     masteredWords: Array.isArray(raw?.masteredWords) ? raw.masteredWords : base.masteredWords,
     learningHistory: Array.isArray(raw?.learningHistory)
       ? raw.learningHistory
@@ -96,6 +125,18 @@ export class Storage {
   }
   static saveWrongWords(v: WrongWordRecord[]) {
     Storage.set('wrongWords', v);
+  }
+  static getWordBank(): WordBankRecord[] {
+    return Storage.read().wordBank;
+  }
+  static saveWordBank(v: WordBankRecord[]) {
+    Storage.set('wordBank', v);
+  }
+  static getWordBooks(): WordBook[] {
+    return Storage.read().wordBooks;
+  }
+  static saveWordBooks(v: WordBook[]) {
+    Storage.set('wordBooks', v);
   }
   static getMasteredWords(): MasteredWord[] {
     return Storage.read().masteredWords;

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import WordInput from './WordInput';
 import NavTree from './NavTree';
 import RecursivePanel from './RecursivePanel';
@@ -6,7 +6,7 @@ import DepthIndicator from './DepthIndicator';
 import SelfTestCard from './SelfTestCard';
 import ResultToast from '@/components/layout/ResultToast';
 import { useAppStore } from '@/store/useAppStore';
-import { ChevronDown, ChevronRight, Compass } from 'lucide-react';
+import { ChevronDown, ChevronRight, Compass, TreePine } from 'lucide-react';
 
 export default function LookupPage() {
   const root = useAppStore((s) => s.rootNode);
@@ -17,8 +17,16 @@ export default function LookupPage() {
   const collapse = useAppStore((s) => s.collapseChild);
   const setFocus = useAppStore((s) => s.setFocus);
   const enterTest = useAppStore((s) => s.enterTest);
+  const expandedDescendantCount = useAppStore((s) => s.expandedDescendantCount);
+  const generateWordBook = useAppStore((s) => s.generateWordBook);
 
   const [treeOpen, setTreeOpen] = useState(false);
+  const [bookGenerated, setBookGenerated] = useState(false);
+
+  // 新查词时重置生成状态
+  useEffect(() => {
+    setBookGenerated(false);
+  }, [root?.id]);
 
   const jump = (id: string) => {
     setFocus(id);
@@ -87,7 +95,29 @@ export default function LookupPage() {
                   focusNodeId={focusId}
                   onFocus={setFocus}
                 />
-                <div className="mt-5 flex justify-end">
+                <div className="mt-5 flex flex-col sm:flex-row gap-3 sm:justify-end">
+                  {expandedDescendantCount() >= 5 && !bookGenerated && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const book = generateWordBook();
+                        if (book) {
+                          setBookGenerated(true);
+                          alert(`单词树已生成！根词「${book.rootWord}」，共 ${book.nodeCount} 个词。去「单词树」Tab 查看。`);
+                        }
+                      }}
+                      className="h-12 w-full sm:w-auto sm:h-11 sm:px-5 px-4 rounded-lg bg-emerald-600 text-white font-medium hover:opacity-90 transition touch-target inline-flex items-center justify-center gap-2"
+                    >
+                      <TreePine size={20} />
+                      生成单词树（{expandedDescendantCount()} 词）
+                    </button>
+                  )}
+                  {bookGenerated && (
+                    <div className="h-12 px-4 rounded-lg bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 inline-flex items-center gap-2 text-sm font-medium">
+                      <TreePine size={18} />
+                      单词树已生成，去「单词树」查看
+                    </div>
+                  )}
                   <button
                     type="button"
                     onClick={enterTest}

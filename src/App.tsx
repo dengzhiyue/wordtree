@@ -1,13 +1,14 @@
 import { useState } from 'react';
 import NavBar from '@/components/layout/NavBar';
 import LookupPage from '@/components/lookup/LookupPage';
-import WrongBankPage from '@/components/wrong-bank/WrongBankPage';
+import WordBankPage from '@/components/wrong-bank/WrongBankPage';
+import WordBookPage from '@/components/word-book/WordBookPage';
 import SettingsPage from '@/components/settings/SettingsPage';
 import FirstRunGuide from '@/components/layout/FirstRunGuide';
 import { useAppStore } from '@/store/useAppStore';
 import { cn } from '@/utils/cn';
 
-type Tab = 'lookup' | 'wrong' | 'settings';
+type Tab = 'lookup' | 'wordbank' | 'wordbook' | 'settings';
 
 export default function App() {
   const [tab, setTab] = useState<Tab>('lookup');
@@ -27,7 +28,8 @@ export default function App() {
         {needGuide && <FirstRunGuide onSetup={() => setTab('settings')} />}
         <div key={tab} className="animate-fadeIn">
           {tab === 'lookup' && <LookupPage />}
-          {tab === 'wrong' && <WrongBankPage />}
+          {tab === 'wordbank' && <WordBankPage />}
+          {tab === 'wordbook' && <WordBookPage />}
           {tab === 'settings' && <SettingsPage />}
         </div>
       </main>

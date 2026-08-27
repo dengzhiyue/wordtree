@@ -36,6 +36,37 @@ export interface WrongWordRecord {
   lastReviewTime: number;
 }
 
+/** 单词库记录：查过的词都入库，答错的额外标记 */
+export interface WordBankRecord {
+  word: string;
+  correctAnswers: string[];
+  wrongCount: number;
+  consecutiveCorrect: number;
+  targetCorrect: number;
+  firstAddedTime: number;
+  lastWrongTime: number; // 0 表示从未答错
+  lastReviewTime: number;
+  userWrongAnswers: string[];
+  isWrong: boolean; // 是否曾答错（控制复习队列）
+}
+
+/** 单词书树节点（WordNode 的精简版，只保留展示数据） */
+export interface WordBookTreeNode {
+  word: string;
+  chineseMeanings: string[];
+  depth: number;
+  children: WordBookTreeNode[];
+}
+
+/** 单词书：一次递归查词生成的树 */
+export interface WordBook {
+  id: string;
+  rootWord: string;
+  createdAt: number;
+  nodeCount: number;
+  tree: WordBookTreeNode;
+}
+
 export interface MasteredWord {
   word: string;
   masteredTime: number;
@@ -51,7 +82,9 @@ export interface LearningRecord {
 }
 
 export interface AppStorageShape {
-  wrongWords: WrongWordRecord[];
+  wrongWords: WrongWordRecord[]; // 兼容旧数据，迁移后不再使用
+  wordBank: WordBankRecord[];
+  wordBooks: WordBook[];
   masteredWords: MasteredWord[];
   learningHistory: LearningRecord[];
   settings: Settings;
@@ -68,6 +101,6 @@ export interface SelfTestState {
 }
 
 export type ReviewSession = {
-  queue: WrongWordRecord[];
+  queue: WordBankRecord[];
   index: number;
 } | null;

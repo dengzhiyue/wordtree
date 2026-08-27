@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import type { WrongWordRecord } from '@/types';
+import type { WordBankRecord } from '@/types';
 import { useAppStore } from '@/store/useAppStore';
 import { formatRelative } from '@/utils/text';
 import ProgressBar from './ProgressBar';
@@ -11,26 +11,26 @@ type Props = {
 };
 
 export default function WrongWordTable({ onSingleTest }: Props) {
-  const list = useAppStore((s) => s.wrongWords);
-  const remove = useAppStore((s) => s.removeFromWrongBank);
+  const list = useAppStore((s) => s.wordBank);
+  const remove = useAppStore((s) => s.removeFromWordBank);
   const del = useAppStore((s) => s.deleteRecord);
   const batchDel = useAppStore((s) => s.batchDelete);
   const batchOut = useAppStore((s) => s.batchRemove);
 
   const [kw, setKw] = useState('');
-  const [sort, setSort] = useState<'wrongCount' | 'lastWrongTime'>('wrongCount');
+  const [sort, setSort] = useState<'wrongCount' | 'firstAddedTime' | 'lastWrongTime'>('firstAddedTime');
   const [selected, setSelected] = useState<Set<string>>(new Set());
 
   const rows = useMemo(() => {
     const lower = kw.trim().toLowerCase();
-    let r: WrongWordRecord[] = lower
+    let r: WordBankRecord[] = lower
       ? list.filter((w) => w.word.includes(lower))
       : list.slice();
-    r.sort((a, b) =>
-      sort === 'wrongCount'
-        ? b.wrongCount - a.wrongCount
-        : b.lastWrongTime - a.lastWrongTime,
-    );
+    r.sort((a, b) => {
+      if (sort === 'wrongCount') return b.wrongCount - a.wrongCount;
+      if (sort === 'lastWrongTime') return b.lastWrongTime - a.lastWrongTime;
+      return b.firstAddedTime - a.firstAddedTime;
+    });
     return r;
   }, [list, kw, sort]);
 
@@ -53,7 +53,7 @@ export default function WrongWordTable({ onSingleTest }: Props) {
       <div className="flex flex-col gap-2">
         <input
           className="h-12 px-3 rounded-lg bg-surface border border-stroke focus:border-brand focus:ring-2 focus:ring-brand/30 outline-none w-full text-ink placeholder:text-ink-muted"
-          placeholder="搜索错词…"
+          placeholder="搜索单词…"
           value={kw}
           onChange={(e) => setKw(e.target.value)}
         />
@@ -62,6 +62,7 @@ export default function WrongWordTable({ onSingleTest }: Props) {
           value={sort}
           onChange={(e) => setSort(e.target.value as any)}
         >
+          <option value="firstAddedTime">按添加时间排序</option>
           <option value="wrongCount">按错误次数排序</option>
           <option value="lastWrongTime">按最近错误时间排序</option>
         </select>
@@ -80,9 +81,9 @@ export default function WrongWordTable({ onSingleTest }: Props) {
                 />
               </th>
               <th className="text-left p-3">单词</th>
-              <th className="text-left p-3 w-24">错误</th>
+              <th className="text-left p-3 w-20">状态</th>
               <th className="text-left p-3">掌握进度</th>
-              <th className="hidden sm:table-cell text-left p-3 w-32">最近错误</th>
+              <th className="hidden sm:table-cell text-left p-3 w-32">添加时间</th>
               <th className="text-left p-3 w-36">操作</th>
             </tr>
           </thead>
@@ -90,7 +91,7 @@ export default function WrongWordTable({ onSingleTest }: Props) {
             {rows.length === 0 && (
               <tr>
                 <td colSpan={6} className="p-10 text-center text-ink-muted">
-                  还没有错题，先去「查单词」答对答错两轮吧～
+                  单词库还是空的，去「查单词」查几个词试试吧～
                 </td>
               </tr>
             )}
@@ -106,45 +107,57 @@ export default function WrongWordTable({ onSingleTest }: Props) {
                 </td>
                 <td className="p-3 font-serif-en font-semibold text-ink">{r.word}</td>
                 <td className="p-3">
-                  <span
-                    className={cn(
-                      'px-2 py-0.5 rounded-full text-xs whitespace-nowrap',
-                      r.wrongCount >= 3
-                        ? 'bg-danger/15 text-danger'
-                        : 'bg-amber-500/15 text-amber-700 dark:text-amber-300',
-                    )}
-                  >
-                    {r.wrongCount} 次
-                  </span>
+                  {r.isWrong ? (
+                    <span
+                      className={cn(
+                        'px-2 py-0.5 rounded-full text-xs whitespace-nowrap',
+                        r.wrongCount >= 3
+                          ? 'bg-danger/15 text-danger'
+                          : 'bg-amber-500/15 text-amber-700 dark:text-amber-300',
+                      )}
+                    >
+                      错 {r.wrongCount} 次
+                    </span>
+                  ) : (
+                    <span className="px-2 py-0.5 rounded-full text-xs bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 whitespace-nowrap">
+                      已收藏
+                    </span>
+                  )}
                 </td>
                 <td className="p-3">
-                  <div className="flex items-center gap-3 max-w-[220px]">
-                    <ProgressBar
-                      className="flex-1"
-                      value={r.consecutiveCorrect}
-                      max={r.targetCorrect}
-                    />
-                    <span className="text-xs text-ink-muted tabular-nums whitespace-nowrap">
-                      {r.consecutiveCorrect}/{r.targetCorrect}
-                    </span>
-                  </div>
+                  {r.isWrong ? (
+                    <div className="flex items-center gap-3 max-w-[220px]">
+                      <ProgressBar
+                        className="flex-1"
+                        value={r.consecutiveCorrect}
+                        max={r.targetCorrect}
+                      />
+                      <span className="text-xs text-ink-muted tabular-nums whitespace-nowrap">
+                        {r.consecutiveCorrect}/{r.targetCorrect}
+                      </span>
+                    </div>
+                  ) : (
+                    <span className="text-xs text-ink-muted">—</span>
+                  )}
                 </td>
                 <td className="hidden sm:table-cell p-3 text-ink-muted whitespace-nowrap">
-                  {formatRelative(r.lastWrongTime)}
+                  {formatRelative(r.firstAddedTime)}
                 </td>
                 <td className="p-3">
                   <div className="flex items-center gap-0.5">
+                    {r.isWrong && (
+                      <button
+                        type="button"
+                        title="重新测试"
+                        onClick={() => onSingleTest(r.word)}
+                        className="touch-target p-2.5 rounded-md hover:bg-surface-muted text-brand inline-flex items-center justify-center"
+                      >
+                        <Play size={16} />
+                      </button>
+                    )}
                     <button
                       type="button"
-                      title="重新测试"
-                      onClick={() => onSingleTest(r.word)}
-                      className="touch-target p-2.5 rounded-md hover:bg-surface-muted text-brand inline-flex items-center justify-center"
-                    >
-                      <Play size={16} />
-                    </button>
-                    <button
-                      type="button"
-                      title="移出错题库（标记已掌握）"
+                      title="移出单词库（标记已掌握）"
                       onClick={() => remove(r.word)}
                       className="touch-target p-2.5 rounded-md hover:bg-surface-muted text-success inline-flex items-center justify-center"
                     >
@@ -154,7 +167,7 @@ export default function WrongWordTable({ onSingleTest }: Props) {
                       type="button"
                       title="删除记录"
                       onClick={() => {
-                        if (confirm(`确认删除错题「${r.word}」？这不会加入已掌握。`)) del(r.word);
+                        if (confirm(`确认从单词库删除「${r.word}」？`)) del(r.word);
                       }}
                       className="touch-target p-2.5 rounded-md hover:bg-surface-muted text-danger inline-flex items-center justify-center"
                     >
@@ -175,7 +188,7 @@ export default function WrongWordTable({ onSingleTest }: Props) {
             type="button"
             className="h-11 px-4 rounded-md bg-brand text-white hover:opacity-90 touch-target flex-1 sm:flex-initial"
             onClick={() => {
-              if (confirm(`将所选 ${selWords.length} 个词标记为已掌握并移出错题库？`)) {
+              if (confirm(`将所选 ${selWords.length} 个词标记为已掌握并移出单词库？`)) {
                 batchOut(selWords);
                 setSelected(new Set());
               }
@@ -187,7 +200,7 @@ export default function WrongWordTable({ onSingleTest }: Props) {
             type="button"
             className="h-11 px-4 rounded-md bg-danger text-white hover:opacity-90 touch-target flex-1 sm:flex-initial"
             onClick={() => {
-              if (confirm(`删除所选 ${selWords.length} 条错题记录（不含已掌握）？`)) {
+              if (confirm(`删除所选 ${selWords.length} 条记录？`)) {
                 batchDel(selWords);
                 setSelected(new Set());
               }

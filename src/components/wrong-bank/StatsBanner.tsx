@@ -44,18 +44,19 @@ function Ring({ rate }: { rate: number }) {
 }
 
 export default function StatsBanner() {
-  const wrong = useAppStore((s) => s.wrongWords);
+  const bank = useAppStore((s) => s.wordBank);
   const mastered = useAppStore((s) => s.masteredWords);
-  const totalEver = new Set([...wrong.map((w) => w.word), ...mastered.map((m) => m.word)]).size;
+  const totalEver = new Set([...bank.map((w) => w.word), ...mastered.map((m) => m.word)]).size;
   const masteredCount = mastered.length;
-  const pending = wrong.length;
+  const wrongCount = bank.filter((w) => w.isWrong).length;
+  const collectedCount = bank.length;
   const rate = totalEver === 0 ? 0 : masteredCount / totalEver;
   return (
     <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
       {[
-        { label: '错题总数', value: wrong.length, tone: 'text-ink' },
+        { label: '单词库', value: collectedCount, tone: 'text-ink' },
+        { label: '其中错词', value: wrongCount, tone: 'text-danger' },
         { label: '已攻克', value: masteredCount, tone: 'text-success' },
-        { label: '待复习', value: pending, tone: 'text-brand' },
       ].map((k) => (
         <div
           key={k.label}

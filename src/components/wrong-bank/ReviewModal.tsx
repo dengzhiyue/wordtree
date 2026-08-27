@@ -175,7 +175,7 @@ export default function ReviewModal({ onClose }: { onClose: () => void }) {
       <div className="w-full max-w-6xl max-h-screen sm:max-h-[94vh] overflow-hidden sm:rounded-2xl bg-surface border-0 sm:border sm:border-stroke sm:shadow-xl flex flex-col pb-safe-bottom">
         <header className="p-4 sm:p-4 border-b border-stroke flex items-center gap-3 pt-safe-top">
           <div className="flex-1 min-w-0">
-            <div className="font-semibold">错题复习</div>
+            <div className="font-semibold">错词复习</div>
             <div className="text-xs text-ink-muted mt-0.5 truncate">
               第 {Math.min(idx + 1, total)} / {total} · 按「错误多 + 久未复习」优先
             </div>
@@ -309,13 +309,13 @@ export default function ReviewModal({ onClose }: { onClose: () => void }) {
                         </ul>
                       </div>
                       {result.mastered ? (
-                        <ResultToast kind="mastered" title="恭喜！该词已攻克，移出错题库 🎉" />
+                        <ResultToast kind="mastered" title="恭喜！该词已攻克，移出单词库 🎉" />
                       ) : result.ok ? (
                         <ResultToast kind="correct" title="回答正确！离攻克又近一步" />
                       ) : (
                         <ResultToast
                           kind="wrong"
-                          title="答错，已记入错题"
+                          title="答错，已记入单词库"
                           desc={result.degraded ? '（语义服务降级，使用近似判定）' : undefined}
                         />
                       )}

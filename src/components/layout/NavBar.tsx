@@ -1,15 +1,16 @@
-import { BookOpen, Bug, Settings, Moon, Sun, Monitor } from 'lucide-react';
+import { BookOpen, Library, Settings, Moon, Sun, Monitor, TreePine } from 'lucide-react';
 import { cn } from '@/utils/cn';
 import { useAppStore } from '@/store/useAppStore';
 
 type Props = {
-  active: 'lookup' | 'wrong' | 'settings';
-  onChange: (t: 'lookup' | 'wrong' | 'settings') => void;
+  active: 'lookup' | 'wordbank' | 'wordbook' | 'settings';
+  onChange: (t: 'lookup' | 'wordbank' | 'wordbook' | 'settings') => void;
 };
 
 const tabs = [
   { id: 'lookup' as const, label: '查单词', icon: BookOpen },
-  { id: 'wrong' as const, label: '错题库', icon: Bug },
+  { id: 'wordbank' as const, label: '单词库', icon: Library },
+  { id: 'wordbook' as const, label: '单词树', icon: TreePine },
   { id: 'settings' as const, label: '设置', icon: Settings },
 ];
 
@@ -72,7 +73,7 @@ export default function NavBar({ active, onChange }: Props) {
           'pb-safe-bottom',
         )}
       >
-        <ul className="grid grid-cols-3">
+        <ul className="grid grid-cols-4">
           {tabs.map(({ id, label, icon: Icon }) => {
             const isActive = active === id;
             return (
