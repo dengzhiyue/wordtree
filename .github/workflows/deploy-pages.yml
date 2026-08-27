@@ -32,7 +32,7 @@ jobs:
 
       - name: Build web assets (Vite dist) with GitHub Pages base path
         env:
-          GITHUB_REPOSITORY: ${{ github.repository }}
+          VITE_BASE: /wordtree/
         run: npm run build
 
       - name: Upload Pages artifact

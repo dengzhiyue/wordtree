@@ -3,10 +3,10 @@ import react from '@vitejs/plugin-react';
 import { VitePWA } from 'vite-plugin-pwa';
 import path from 'node:path';
 
-// GitHub Pages 部署路径格式：https://<user>.github.io/<repo>/
-// 环境变量 GITHUB_REPOSITORY 在 CI 下自动为 dengzhiyue/wordtree，取出末尾段 wordtree 做 base
-const ghRepo = (process.env.GITHUB_REPOSITORY || '').split('/')[1];
-const base = ghRepo ? `/${ghRepo}/` : '/';
+// 显式控制构建输出的资源路径前缀，区分场景：
+//   · 本地开发 / 安卓 APK 构建（Capacitor）：默认 '/'
+//   · GitHub Pages 部署（deploy-pages.yml）：显式传入 VITE_BASE='/wordtree/'
+const base = process.env.VITE_BASE || '/';
 
 export default defineConfig({
   base,
@@ -26,13 +26,13 @@ export default defineConfig({
         theme_color: '#7c3aed',
         icons: [
           {
-            src: '/icon-192.svg',
+            src: `${base}icon-192.svg`,
             sizes: '192x192',
             type: 'image/svg+xml',
             purpose: 'any maskable',
           },
           {
-            src: '/icon-512.svg',
+            src: `${base}icon-512.svg`,
             sizes: '512x512',
             type: 'image/svg+xml',
             purpose: 'any maskable',
