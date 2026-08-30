@@ -2,7 +2,12 @@ import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import { VitePWA } from 'vite-plugin-pwa';
 import path from 'node:path';
+// 显式控制构建输出的资源路径前缀，区分场景：
+//   · 本地开发 / 安卓 APK 构建（Capacitor）：默认 '/'
+//   · GitHub Pages 部署（deploy-pages.yml）：显式传入 VITE_BASE='/wordtree/'
+var base = process.env.VITE_BASE || '/';
 export default defineConfig({
+    base: base,
     plugins: [
         react(),
         VitePWA({
@@ -12,20 +17,20 @@ export default defineConfig({
                 name: 'RecurWords · 递归式英文词汇学习',
                 short_name: 'RecurWords',
                 description: '用英文解释英文，递归理解直至掌握；答错自动入错题库。',
-                start_url: '/',
+                start_url: base,
                 display: 'standalone',
                 orientation: 'portrait-primary',
                 background_color: '#ffffff',
-                theme_color: '#7c3aed',
+                theme_color: '#2F8FA7',
                 icons: [
                     {
-                        src: '/icon-192.svg',
+                        src: "".concat(base, "icon-192.svg"),
                         sizes: '192x192',
                         type: 'image/svg+xml',
                         purpose: 'any maskable',
                     },
                     {
-                        src: '/icon-512.svg',
+                        src: "".concat(base, "icon-512.svg"),
                         sizes: '512x512',
                         type: 'image/svg+xml',
                         purpose: 'any maskable',

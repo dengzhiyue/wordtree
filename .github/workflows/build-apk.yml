@@ -88,6 +88,103 @@ jobs:
         with:
           cache-encryption-key: ${{ runner.os }}-gradle-enc
 
+      - name: Install sharp (SVG→PNG) and generate Android adaptive/launcher icons from public/icon.svg
+        id: icons
+        run: |
+          set -e
+          # sharp 0.33 ships prebuilt binaries for linux-x64, no native compile needed.
+          npm install --no-save --no-audit --no-fund sharp@0.33.5
+          # Verify
+          node -e "const s=require('sharp'); console.log('sharp', s.versions && s.versions.libvips || 'ok')"
+
+          SRC="public/icon.svg"
+          DST="android/app/src/main/res"
+
+          # --- 1) Legacy square launcher icons (mipmap-*dpi/ic_launcher.png) ---
+          # Android dpi buckets: mdpi 48, hdpi 72, xhdpi 96, xxhdpi 144, xxxhdpi 192
+          generate_png() {
+            local size="$1" folder="$2" name="$3"
+            mkdir -p "$DST/$folder"
+            # sharp: resize with background (keep aspect, then extend to exact size — no crop)
+            node -e "
+              const sharp = require('sharp');
+              const fs = require('fs');
+              sharp(process.argv[1], { density: Math.max(240, $size*3) })
+                .resize($size, $size, { fit: 'contain', background: { r:0,g:0,b:0,alpha:0 } })
+                .png({ compressionLevel: 9 })
+                .toFile(process.argv[2])
+                .then(()=>console.log('wrote', process.argv[2], $size+'x'+$size))
+                .catch(e=>{console.error(e);process.exit(1)});
+            " "$SRC" "$DST/$folder/$name.png"
+          }
+
+          generate_png  48 "mipmap-mdpi"     "ic_launcher"
+          generate_png  72 "mipmap-hdpi"     "ic_launcher"
+          generate_png  96 "mipmap-xhdpi"    "ic_launcher"
+          generate_png 144 "mipmap-xxhdpi"   "ic_launcher"
+          generate_png 192 "mipmap-xxxhdpi"  "ic_launcher"
+
+          # --- 2) Round launcher icons (ic_launcher_round.png) — same assets ---
+          generate_png  48 "mipmap-mdpi"     "ic_launcher_round"
+          generate_png  72 "mipmap-hdpi"     "ic_launcher_round"
+          generate_png  96 "mipmap-xhdpi"    "ic_launcher_round"
+          generate_png 144 "mipmap-xxhdpi"   "ic_launcher_round"
+          generate_png 192 "mipmap-xxxhdpi"  "ic_launcher_round"
+
+          # --- 3) Adaptive-icon foreground (ic_launcher_foreground.png, 108dp) ---
+          # Foreground layer is larger than icon: mdpi 108 / hdpi 162 / xhdpi 216 / xxhdpi 324 / xxxhdpi 432
+          generate_png 108 "mipmap-mdpi"     "ic_launcher_foreground"
+          generate_png 162 "mipmap-hdpi"     "ic_launcher_foreground"
+          generate_png 216 "mipmap-xhdpi"    "ic_launcher_foreground"
+          generate_png 324 "mipmap-xxhdpi"   "ic_launcher_foreground"
+          generate_png 432 "mipmap-xxxhdpi"  "ic_launcher_foreground"
+
+          # --- 4) Adaptive-icon background layer: solid teal matching icon.svg bg gradient midpoint ---
+          generate_bg_png() {
+            local size="$1" folder="$2"
+            mkdir -p "$DST/$folder"
+            node -e "
+              const sharp = require('sharp');
+              const size = $size;
+              // Match the teal gradient middle — single color (safe region of adaptive icon)
+              const bg = Buffer.from(
+                '<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"'+size+'\" height=\"'+size+'\">'+
+                '<defs><linearGradient id=\"g\" x1=\"0\" y1=\"0\" x2=\"0\" y2=\"1\">'+
+                '<stop offset=\"0%\" stop-color=\"#6ECAC8\"/>'+
+                '<stop offset=\"60%\" stop-color=\"#3A8DA3\"/>'+
+                '<stop offset=\"100%\" stop-color=\"#1C4E68\"/>'+
+                '</linearGradient></defs>'+
+                '<rect width=\"100%\" height=\"100%\" fill=\"url(#g)\" rx=\"'+(size*0.2)+'\"/></svg>'
+              );
+              sharp(bg)
+                .resize(size, size, { fit: 'fill' })
+                .png({ compressionLevel: 9 })
+                .toFile('$DST/$folder/ic_launcher_background.png')
+                .then(()=>console.log('wrote bg', '$DST/$folder', size))
+                .catch(e=>{console.error(e);process.exit(1)});
+            "
+          }
+          generate_bg_png 108 "mipmap-mdpi"
+          generate_bg_png 162 "mipmap-hdpi"
+          generate_bg_png 216 "mipmap-xhdpi"
+          generate_bg_png 324 "mipmap-xxhdpi"
+          generate_bg_png 432 "mipmap-xxxhdpi"
+
+          # --- 5) Play Store / Package Manager listing graphic (512x512 highres png, good to have in-tree) ---
+          mkdir -p android/app/src/main/play
+          node -e "
+            const sharp = require('sharp');
+            sharp('public/icon.svg', { density: 480 })
+              .resize(512, 512, { fit: 'contain', background: { r:0,g:0,b:0,alpha:0 } })
+              .png({ compressionLevel: 9 })
+              .toFile('android/app/src/main/play/ic_launcher-web.png')
+              .then(()=>console.log('wrote web 512'))
+              .catch(e=>{console.error(e);process.exit(1)});
+          "
+
+          echo "=== Icon files installed ==="
+          find android/app/src/main/res/mipmap-* -type f | sort
+
       - name: Build debug APK with ./gradlew assembleDebug (project-owned wrapper)
         run: |
           set -e
